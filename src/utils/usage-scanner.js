@@ -21,11 +21,15 @@ function validateUsageData(data) {
     if (!data.timestamp) return false;
     if (!data.message || typeof data.message !== 'object') return false;
     if (!data.message.usage || typeof data.message.usage !== 'object') return false;
-    
+
     const usage = data.message.usage;
     // Must have both input_tokens and output_tokens as numbers
-    return typeof usage.input_tokens === 'number' && 
-           typeof usage.output_tokens === 'number';
+    if (typeof usage.input_tokens !== 'number' || typeof usage.output_tokens !== 'number') return false;
+
+    // Skip entries with zero total tokens (e.g. <synthetic> metadata)
+    const totalTokens = usage.input_tokens + usage.output_tokens
+      + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0);
+    return totalTokens > 0;
   } catch {
     return false;
   }
@@ -56,12 +60,12 @@ function getClaudePaths() {
 function createUniqueHash(data) {
   const requestId = data.requestId;
   const messageId = data.message?.id;
-  
+
   // Match ccusage behavior: require BOTH messageId AND requestId
   if (requestId && messageId) {
     return `${messageId}:${requestId}`;
   }
-  
+
   // Return null if either is missing - these entries won't be deduplicated
   return null;
 }
